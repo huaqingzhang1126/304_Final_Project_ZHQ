@@ -1,0 +1,157 @@
+---
+title: "Predicting Full Voter Turnout Results of the 2019 Canadian Federal Election using Logistic Regression and Postratification"
+author: "Huaqing Zhang"
+date: "December 22, 2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+Code and data supporting this analysis is available: https://github.com/huaqingzhang1126/304_Final_Project_ZHQ 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lme4)
+library(glm2)
+
+# Loading in the cleaned survey Data
+survey_data <- read_csv("C:/Sarah/third-Fall/STA304/Final project/survey_data.csv")
+
+# Loading in the cleaned census Data
+census_data <- read_csv("C:/Sarah/third-Fall/STA304/Final project/census_data.csv")
+
+```
+# Abstract
+
+Canadian Federal ELection holds every four years and election result is directly related to the individual, family and whole country. However, much research shows that response rates have declined over the past several decades (Wang, Rothschild, Goel & Gelman, 2014). In this report, I try to get the estimation of the 2019 Canadian federal election result after assuming all legal voters voted. I demonstrate this approach by creating predictions from Canadian Election Survey (CES) dataset: an online survey for the 2019 Canadian Election Study including a dual-mode, two-wave data collection with a rolling cross-section during the 2019 federal election campaign and a post-election follow-up survey. Then I build logistic regression using four predictors, age, sex, province and education of voters. The estimator of this logistic regression is the probability of voters voting for the Liberal Party. After building a model, I make use of post-stratification technique based on gss data which is General Social Survey (GSS) in 2017, which is an annual sample survey tracking the changes within the Canadian society. Finally, I find that after all legal voters vote for the 2019 Canadian federal election, the estimation of vote for Liberal Party is 33.7% slightly higher than the actual election result which make me notice that voter turnout is also an important factor to the election result. 
+
+## Keywords 
+
+Logistic regression and poststratification, Full voter turnout, Canadian federal election, Liberal Party
+
+# Introduction
+
+An ELection is an important event that is directly related to the individual, family and country. Hence everyone is concerned about the election result. Statistical analysis is frequently applied to predict election result. The public can get the election result based on representative polls which randomly asked individuals who they intend to vote for. However, as response rate has declined over the past several decades (Wang, Rothschild, Goel & Gelman, 2014), and I find that the turnout in 2019 Canadian federal election is around 68%. Many legal voters do not vote for 2019 federal election some reason. Whether voter turnout is an important factor to election selection is a hot and compelling topic. 
+
+Hence, in this report I try to predict full voter turnout result of the 2019 Canadian federal election. To do this election forecast, I build a logistic regression model and then make use of post-stratification technique. 
+
+And two data sets are used for this repoty, survey data which is CES data and census data which is GSS data. Firstly, I am employing a logistic regression model based on CES data, the estimator is if voters voting for the Liberal Party, four predictors are age, sex, education and province of these voters. Historically, the voting outcome differs significantly by province and education. To take into account this difference in sample and target population, I am employing a post-stratification technique to decrease the variance and bias of the province and education of voters. Then I use ANOVA and BIC to check the goodness of this logistic model i built. And the estimation of the proportion of full voter turnout of the 2019 Canadian federal election is provided in the Result section. The analysis of this data along with conclusions are presented in the Discussion section.
+
+# Methodology
+
+## Data
+
+This analysis is based on the data which is collected from an online survey for the 2019 Canadian Election Study. The CES included a dual-mode, two-wave data collection with a rolling cross-section during the 2019 federal election campaign and a post-election follow-up survey. This population of this data is all Canadian citizens and permanent residents, aged 18 or older. The frame is Canadian citizens and permanent residents, aged 18 or older, can see campaign period survey and post-election survey. The sample is people who take these two surveys. CES data consists of 620 variables and 37822 observations. This data contains many field information of the respondents. However, there are lots of missing value under some variables. In this report, to predict the full voter turnout result of 2019 Canadian Federal Election, I select five variables, age, sex, province, education of the respondents and the party they firstly voted for. The reason why I choose province as a predictor is that different parties will roll out specific regulations or policies. Thus, voters from different provinces will make different decisions on whether they should vote for the Liberal party or not. Moreover, voters of different education level may have different attitudes to parties. Likewise, voters from similar age range might have similar preferences on parties selection. Therefore, I choose these four predictors. Since I am only interested in whether voters vote for the liberal party or not, I remove response which is "Don't know/ Prefer not to answer". After cleaning CES data, there are twelve categories in predictor province and six categories in predictor education. Table 1 shows six samples from CES data. For one variable in this table, vote_liberal, 1 refers to this voter vote for Liberal party, 0 means this voter would not vote for Liberal party. 
+
+**Table 1, Six Samples in CES Data**
+
+```{r,echo=FALSE}
+knitr::kable(head(survey_data))
+```
+
+## Model
+
+I build a logistic regression model to model the proportion of voters who will vote for Liberal Party with the software R studio. I am interested in whether the respondent voted Liberal Party or not (which is a binary response), so other options like "Conservative Party","Bloc Québécois", "Green Party", “ndp” and etc.. have been adjusted to 0 notation in this sample data. I make use of the glm() function in the R package glm2 (Marschner,2011) to build the logistic regression model which is: 
+
+$$ Pr(y_{i})=log(\frac{y_{i}}{1-y_{i}}) = \beta_{o}+\beta_1x_{age} + \beta_2x_{sex}+\beta_3x_{province} + \beta_4x_{education}+ \epsilon$$
+Here $y_{i}$ represents the proportion of voters who will vote for Liberal Party. And I selected four predictors: age, sex, education of voters and their province. $\beta_0$ represents the intercept of the model. Additionally, $\beta_1$ represents one slope of the model. So, for voters one unit increase in age, then there will be an average change in the probability of voting for Liberal Party. Similarly, $\beta_2$ represents the slope of sex variable. Since $\beta_3$ refers to the slope of province, and it has 12 categories (Alberta, British Columbia, Manitoba, New Brunswick, Newfound and Labrador, Northwest Territories, Nova Scotia, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan), Alberta is a base line, if existing other province like British Columbia, Manitoba and other province then it changes in probability. $\beta_4$ represents the slope of education, and there are 6 categories ("Bachelor's degree (e.g. B.A., B.Sc., LL.B.)", "College, CEGEP or other non-university certificate or di...", "High school diploma or a high school equivalency certificate", "Less than high school diploma or its equivalent", "University certificate or diploma below the bachelor's level", "University certificate, diploma or degree above the bach..."), Bachelor's degree is a base line. While other education level would lead to change of the probability of voting for Liberal Party. 
+
+
+```{r,echo=FALSE,include=FALSE}
+# Creating the Model
+fullmodel <- glm(vote_liberal ~ age + sex + province + education, data=survey_data, family=binomial)
+```
+## Post-Stratification 
+
+In order to estimate the proportion of all legal voters who will vote for Liberal Party, I demonstrate post-stratification technique. Historically, the voting outcome differs significantly by province and education which shows that CES data is not representative of the whole population. Thus, we would apply a post-stratification technique to consider the difference in sample and target population. Specifically, we generate the cells by considering all combinations of age (66 categories), sex (2 categories), province (12 categories) and education (6 categories), thus partitioning the data into 9504 cells. Using the logistic regression model described in the previous subsection I will estimate the probability of the full voter turnout voting for Libearly Party in each cell. I will then weigh each proportion estimate (within each cell) by the respective population size of that cell and sum those values and divide that by the entire population size. The post-stratification estimate can be noted as:
+
+$$  \hat{y}^{ps} = \frac{\sum{N_{j}\hat{y_{j}}}}{\sum{N_{j}}} $$
+
+where $\hat{y_{j}}$ represents the estimate in each cell j, and $N_j$ represents the size of the $j^{th}$ cell in the population. 
+
+## ANOVA and BIC for the logistic regression model 
+
+In order to determine the significance of four independent variables (age, sex, province and education), I apply an ANOVA table for this logistic regression model. Moreover, I make use of Bayesian Information Criterion (BIC) to balances goodness of this logistic regression fit.
+
+```{r,echo=FALSE,include=FALSE}
+
+ #Here I will perform the post-stratification calculation
+
+census_data$logodds_estimate <-
+  fullmodel %>%
+  predict(newdata = census_data)
+
+census_data$estimate <-
+  exp(census_data$logodds_estimate)/(1+exp(census_data$logodds_estimate))
+
+
+census_data %>%
+  mutate(alp_predict_prop = estimate*n) %>%
+  summarise(alp_predict = sum(alp_predict_prop)/sum(n))
+```
+
+# Results
+
+First I built a logistic regression model, which account for age, sex, province and education of voters, then I used the post-stratification technique to estimate the proportion of voters voting for Liberal Party. Consequently, I estimate that the proportion of voters in favour of voting of Liberal Party to be *0.3374*. 
+
+Moreover, to determine the significance of four independent variables (age, sex, province and education), I apply an ANOVA table for this logistic regression model. From Table 2, it illustrates that the residual deviance of the null model with just an intercept is 33701.35, every addition of predictors decreases the residual deviance. For instance, when age is a predictor, the residual deviance decreases from 33701 to 33659. Similarly, as sex, province and education of voter are predictors, the residual deviance decreases into 33649, 32791, and 32475.
+
+In addition, in order to find a better model, I make use of BIC and the result shows that the logistic model with these four predictor is a good fit with BIC equals to 32506.02.
+
+**Table 2, ANOVA table**
+```{r,echo=FALSE,warning=FALSE}
+anova <- data.frame(anova(fullmodel))
+knitr::kable(anova)
+```
+
+
+```{r,echo=FALSE,include=FALSE}
+backBIC = step(fullmodel, direction= "backward",k =log(length(survey_data)))
+```
+
+# Discussion
+
+In this report, I make a forecast to the result of the 2019 Canadian federal election based on CES data. I am interested in differences of outcome if all legal voters in Canada voted for the 2019 Canada federal election. Four predictors were selected, age, sex, province and education of voters. Estimator is whether the voter will vote for Liberal Party or not. I make use of a logistic regression model since the estimator is binary. By applying BIC to this logistic model, I conclude that this logistic model is a good fit, these four predictors is not duplicate and they all have a significant effect on the proportion of voters voting for Liberal Party. After check the Model's goodness, I use an ANOVA table, it shows that compared to the null model, the residual deviance of the logistic regression model decreases by the addition of these four predictors. Hence, four predictors can be used to predict the result of the 2019 Canadian federal election. After applying the logistic model, to predict full voter turnout result of 2019 Canadian federal election, I make use of the post-stratification technique, finally we obtain the probability of full voter turnout voting for Liberal Party is 0.3374. 
+
+In conclusion, since the probability of voting for Liberal Party under full voter turnout is around 33.7%, compare to the actual election result, Liberal party get 33.1% vote, the predicting results is slightly higher. Since there are lots of response in CES data is "Don't know/prefer not to answer", I just remove these response which affect this estimation. However, under post-stratification technique, full voter turnouts leads to a higher result of voting for Liberal Party in 2019 Canadian federal election. This means many people predict to vote for Liberal Party, but actually they do not vote in this election period. Furthermore, by this logistic model, which account for age, sex, province and education, I can find that voter turnout is quite important since different voter turnout will lead to different election result. Increasing voter turnout will make the election result more accurate and reflect more attitude of the public to the different parties.  
+
+
+## Weaknesses
+
+First, I cleaned the raw data in the very first step, there are many responses like "Don't know/Prefer not to answer", and I just remove these responses, which might also affect the accuracy of estimation.
+second, as I use a logistic regression model to analyze the data, I only used 4 variables from the data, which might not be the most significant variables. This would cause some error on predicting the result of the 2019 Canada federal election slightly. Third, Since the report is based on online survey as a method to collect the data, some legal voters did not do this survey, which will also lead to some bias if estimation. 
+
+## Next Steps
+
+It is sufficient for us to select more predictors in this study, which can help reduce the errors for prediction, such as the income of the voters.
+Also, before building the regression model, the correlation between predictors should be checked as it can impact the prediction. Since we choose age, sex, race and region as our predictors, more predictors could be selected to build the model.
+Meanwhile, I find that turnouts will influences the election result, therefore I think I can do some follow-up surveys on voter’s opinions on reason why they vote or not. Increasing turnouts is significant for improving estimation in future elections.
+
+# References
+
+Barboza, I & Williams R. (2005). Post-stratification and response bias in survey data with applications in political science. Michigan State University. https://msu.edu/~barbozag/Web/poststrat.pdf
+
+Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker. (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1-48. doi:10.18637/jss.v067.i01.
+
+Hadley Wickham and Evan Miller (2020). haven: Import and  Export 'SPSS', 'Stata' and 'SAS' Files. R package version2.3.1. https://CRAN.R-project.org/package=haven
+Marschner, I. C. (2011). glm2: Fitting Generalized Linear Models with Convergence Problems. The R Journal 3(2): 12-15
+
+General Social Survey-Family(GSS). Statistics Canada. https://bit.ly/2T8PrNa
+
+General Social Survey on Family (cycle 31), 2017. Statistics Canada. http://dc.chass.utoronto.ca/myaccess.html
+
+Stephenson L, Allison H, Daniel R & Peter L. Forthcoming. 'Measuring Preferences and Behaviour in the 2019 Canadian Election Study,' Canadian Journal of Political Science. Retrieved from https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DUS88V>
+
+Stephenson, Laura B; Harell, Allison; Rubenson, Daniel; Loewen, Peter John. (2020). 2019 Canadian Election Study - Online Survey. Harvard Dataverse, V1. Retrieved from https://doi.org/10.7910/DVN/DUS88V. 
+
+R Core Team. (2020). R: A Language and Environment for Statistical Computing. Vienna, Austria: R Foundation for Statistical Computing. https://www.R-project.org/.
+
+Robinson, David, Alex Hayes, and Simon Couch. (2020). Broom: Convert Statistical Objects into Tidy Tibbles. https://CRAN.R-project.org/package=broom.
+
+Wang, W., Rothschild, D., Goel, S., & Gelman, A. (2015). Forecasting elections with non-representative polls.International Journal of Forecasting,31(3), 980-991.
+
+Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H. (2019). “Welcome to the tidyverse.” Journal of Open Source Software, 4(43), 1686. doi: 10.21105/joss.01686.
+
+Rohan Alexander & Sam Caetano. (2020). cleaning_gss.R. STA304: Surveys, Sampling and Observational Data. University of Toronto.
+
+Zahorski, Alex.(2020). Multilevel Regression with Post Stratification for the National level Viber/Street poll on the 2020 Presidential Election in Belarus. Uladzimir Karatkevich National university of Belarus Miensk. https://arxiv.org/abs/2009.06615v1 
+
